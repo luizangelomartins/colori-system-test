@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full w-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Estúdio de Colorir Interativo - ColoriStudio Pro Mobile</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- SparkMD5 JS Library for client-side MD5 hashing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.min.js"></script>
+  <style>
+    /* Prevent pull-to-refresh & overscroll on mobile browsers */
+    html, body {
+      overscroll-behavior-y: none;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Checkerboard background for canvas viewport */
+    .bg-checkerboard {
+      background-color: #0f172a;
+      background-image: linear-gradient(45deg, #1e293b 25%, transparent 25%),
+                        linear-gradient(-45deg, #1e293b 25%, transparent 25%),
+                        linear-gradient(45deg, transparent 75%, #1e293b 75%),
+                        linear-gradient(-45deg, transparent 75%, #1e293b 75%);
+      background-size: 24px 24px;
+      background-position: 0 0, 0 12px, 12px -12px, -12px 0px;
+    }
+
+    /* Active Tool Highlighting */
+    .tool-btn.active {
+      background-color: #3b82f6;
+      color: white;
+      box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
+    }
+
+    /* Foto Original Paper Frame Styling */
+    .photo-frame {
+      background-color: #ffffff;
+      padding: 12px 12px 24px 12px;
+      border-radius: 6px;
+      box-shadow: 
+        0 20px 25px -5px rgba(0, 0, 0, 0.5),
+        0 10px 10px -5px rgba(0, 0, 0, 0.3),
+        inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+      position: relative;
+    }
+    @media (min-width: 640px) {
+      .photo-frame {
+        padding: 16px 16px 28px 16px;
+      }
+    }
+    .photo-frame::after {
+      content: 'Foto Original • ColoriStudio';
+      position: absolute;
+      bottom: 6px;
+      right: 14px;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+      text-transform: uppercase;
+      font-family: sans-serif;
+    }
+
+    /* Shake animation for incorrect password */
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+    .animate-shake {
+      animation: shake 0.4s ease-in-out;
+    }
+
+    /* Disable text selection */
+    .no-select {
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* Active Touch Action for smooth drawing */
+    canvas {
+      touch-action: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 h-full w-full overflow-hidden flex flex-col font-sans no-select">
+
+  <!-- AUTHENTICATION OVERLAY MODAL -->
+  <div id="authModal" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+    <div id="authCard" class="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl p-6 max-w-sm w-full my-auto transition-all duration-300">
+      <div class="text-center mb-5">
+        <div class="inline-flex p-3 bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 rounded-2xl shadow-lg mb-3">
+          <i class="fa-solid fa-lock text-2xl text-white"></i>
+        </div>
+        <h2 class="text-xl font-bold text-white tracking-wide">ColoriStudio Pro</h2>
+        <p class="text-xs text-slate-400 mt-1">Digite a senha de acesso para liberar a mesa de pintura</p>
+      </div>
+
+      <form id="authForm" onsubmit="return false;" class="space-y-4">
+        <div>
+          <label for="passwordInput" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Senha de Acesso</label>
+          <div class="relative">
+            <input type="password" id="passwordInput" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-700 focus:border-indigo-500 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none transition font-mono text-base min-h-[44px]">
+            <button type="button" id="togglePasswordVisibility" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center">
+              <i class="fa-solid fa-eye text-sm"></i>
+            </button>
+          </div>
+        </div>
+
+        <div id="authAlert" class="hidden p-3 rounded-xl text-xs font-medium flex items-center space-x-2">
+          <i id="authAlertIcon" class="fa-solid fa-circle-exclamation text-sm shrink-0"></i>
+          <span id="authAlertMsg"></span>
+        </div>
+
+        <div class="flex items-center justify-between text-xs text-slate-400 font-medium px-1">
+          <span>Tentativas restantes:</span>
+          <span id="attemptsCounter" class="font-mono text-amber-400 font-bold">5 / 5</span>
+        </div>
+
+        <button type="submit" id="loginBtn" class="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl shadow-lg transition flex items-center justify-center space-x-2 text-base min-h-[48px]">
+          <i class="fa-solid fa-right-to-bracket"></i>
+          <span>Entrar no Estúdio</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOP HEADER (Desktop & Mobile) -->
+  <header class="bg-slate-800 border-b border-slate-700 px-3 py-2 flex items-center justify-between shrink-0 z-20">
+    <div class="flex items-center space-x-2">
+      <div class="bg-gradient-to-tr from-pink-500 via-purple-500 to-indigo-500 p-2 rounded-xl text-white shadow-md">
+        <i class="fa-solid fa-paint-brush text-base sm:text-lg"></i>
+      </div>
+      <div>
+        <h1 class="font-bold text-sm sm:text-base leading-tight text-white">ColoriStudio</h1>
+        <p class="text-[10px] text-slate-400 hidden sm:block">Livro de Colorir Touch & Mobile Pro</p>
+      </div>
+    </div>
+
+    <!-- Header Tools -->
+    <div class="flex items-center space-x-1.5 sm:space-x-2">
+      <!-- Upload Custom Image -->
+      <label class="cursor-pointer bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-2.5 py-2 rounded-lg flex items-center space-x-1.5 transition shadow min-h-[38px]">
+        <i class="fa-solid fa-file-arrow-up text-sm"></i>
+        <span class="hidden sm:inline">Imagem</span>
+        <input type="file" id="imageInput" accept="image/png, image/jpeg, image/webp, image/svg+xml" class="hidden">
+      </label>
+
+      <!-- Templates Dropdown -->
+      <div class="relative inline-block">
+        <button id="templateBtn" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium px-2.5 py-2 rounded-lg flex items-center space-x-1 transition border border-slate-600 min-h-[38px]">
+          <i class="fa-solid fa-shapes text-amber-400"></i>
+          <span class="hidden sm:inline">Modelos</span>
+          <i class="fa-solid fa-chevron-down text-[10px] ml-0.5"></i>
+        </button>
+        <div id="templateMenu" class="hidden absolute right-0 mt-2 w-44 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl py-1.5 z-50">
+          <button data-template="mandala" class="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 flex items-center space-x-2 min-h-[40px]">
+            <i class="fa-solid fa-certificate text-purple-400"></i>
+            <span>Mandala</span>
+          </button>
+          <button data-template="landscape" class="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 flex items-center space-x-2 min-h-[40px]">
+            <i class="fa-solid fa-mountain-sun text-emerald-400"></i>
+            <span>Paisagem</span>
+          </button>
+          <button data-template="cat" class="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 flex items-center space-x-2 min-h-[40px]">
+            <i class="fa-solid fa-cat text-amber-400"></i>
+            <span>Gatinho</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="h-5 w-px bg-slate-700 mx-0.5"></div>
+
+      <button id="logoutBtn" title="Bloquear Sessão" class="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-700 rounded-lg transition min-w-[38px] min-h-[38px] flex items-center justify-center">
+        <i class="fa-solid fa-right-from-bracket"></i>
+      </button>
+
+      <button id="downloadBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-2.5 py-2 rounded-lg flex items-center space-x-1 transition shadow min-h-[38px]">
+        <i class="fa-solid fa-download"></i>
+        <span class="hidden sm:inline">Salvar</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- DESKTOP LEFT TOOLBAR -->
+    <aside class="hidden md:flex w-64 bg-slate-800 border-r border-slate-700 flex-col justify-between shrink-0 z-10 overflow-y-auto p-4 space-y-4">
+      <div>
+        <h2 class="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-3">Ferramentas & Pincéis</h2>
+        <div class="grid grid-cols-2 gap-2" id="desktopToolGrid">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="border-t border-slate-700/80 pt-4 space-y-4">
+        <div>
+          <div class="flex justify-between text-xs text-slate-300 mb-1">
+            <span>Tamanho do Traço</span>
+            <span id="brushSizeVal" class="font-mono text-slate-400">14px</span>
+          </div>
+          <input type="range" id="brushSize" min="1" max="100" value="14" class="w-full accent-indigo-500 bg-slate-900 rounded-lg cursor-pointer h-2">
+        </div>
+
+        <div>
+          <div class="flex justify-between text-xs text-slate-300 mb-1">
+            <span>Opacidade</span>
+            <span id="opacityVal" class="font-mono text-slate-400">100%</span>
+          </div>
+          <input type="range" id="brushOpacity" min="5" max="100" value="100" class="w-full accent-indigo-500 bg-slate-900 rounded-lg cursor-pointer h-2">
+        </div>
+
+        <div id="toleranceGroupDesktop">
+          <div class="flex justify-between text-xs text-slate-300 mb-1">
+            <span>Tolerância do Balde</span>
+            <span id="toleranceVal" class="font-mono text-slate-400">32</span>
+          </div>
+          <input type="range" id="fillTolerance" min="1" max="120" value="32" class="w-full accent-cyan-500 bg-slate-900 rounded-lg cursor-pointer h-2">
+        </div>
+      </div>
+
+      <!-- Edge Detection Settings -->
+      <div class="border-t border-slate-700/80 pt-4">
+        <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-2">Ajuste de Foto/Linha</span>
+        <div class="space-y-3 bg-slate-900/50 p-3 rounded-xl border border-slate-700/50 text-xs">
+          <div>
+            <label class="text-slate-400 block mb-1">Modo de Exibição</label>
+            <select id="renderMode" class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded-lg p-1.5 focus:outline-none">
+              <option value="lineart">Linhas Detectadas (B&W)</option>
+              <option value="original">Foto Original</option>
+            </select>
+          </div>
+          <div>
+            <div class="flex justify-between text-slate-400 mb-1">
+              <span>Limiar</span>
+              <span id="thresholdVal" class="font-mono">110</span>
+            </div>
+            <input type="range" id="lineThreshold" min="10" max="230" value="110" class="w-full accent-indigo-500 bg-slate-900 rounded-lg h-1.5">
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER CANVAS WORKSPACE -->
+    <main id="canvasContainer" class="flex-1 relative overflow-hidden bg-checkerboard flex items-center justify-center cursor-crosshair touch-none">
+      
+      <!-- Photo Frame / Canvas Wrapper -->
+      <div id="canvasViewport" class="photo-frame transition-transform duration-75 origin-top-left" style="transform: translate(0px, 0px) scale(1);">
+        <div class="relative overflow-hidden bg-white rounded-sm shadow-inner">
+          <canvas id="colorCanvas" class="block"></canvas>
+          <canvas id="lineCanvas" class="absolute top-0 left-0 pointer-events-none" style="mix-blend-mode: multiply;"></canvas>
+        </div>
+      </div>
+
+      <!-- FLOATING ACTION BUTTONS FOR TOUCH / MOBILE -->
+      <div class="absolute top-3 right-3 flex flex-col space-y-2 z-20">
+        <button id="undoBtn" title="Desfazer" class="w-10 h-10 bg-slate-800/90 border border-slate-700 rounded-full text-slate-200 shadow-lg flex items-center justify-center active:bg-slate-700 disabled:opacity-40">
+          <i class="fa-solid fa-rotate-left text-sm"></i>
+        </button>
+        <button id="redoBtn" title="Refazer" class="w-10 h-10 bg-slate-800/90 border border-slate-700 rounded-full text-slate-200 shadow-lg flex items-center justify-center active:bg-slate-700 disabled:opacity-40">
+          <i class="fa-solid fa-rotate-right text-sm"></i>
+        </button>
+        <button id="resetZoomBtn" title="Centralizar" class="w-10 h-10 bg-slate-800/90 border border-slate-700 rounded-full text-slate-200 shadow-lg flex items-center justify-center active:bg-slate-700">
+          <i class="fa-solid fa-expand text-sm"></i>
+        </button>
+      </div>
+
+      <!-- Dimensions & Zoom Badge -->
+      <div class="absolute bottom-16 sm:bottom-4 left-3 bg-slate-800/80 backdrop-blur-md border border-slate-700 text-slate-300 text-[10px] sm:text-xs px-2.5 py-1 rounded-full shadow-lg pointer-events-none flex items-center space-x-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="canvasDimensions">1000 x 1000</span>
+        <span id="zoomLevel" class="font-mono text-slate-400">100%</span>
+      </div>
+
+      <!-- Loading Spinner -->
+      <div id="loader" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center z-30">
+        <div class="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+        <p class="text-xs font-medium text-slate-200">Processando imagem...</p>
+      </div>
+    </main>
+
+    <!-- DESKTOP RIGHT COLOR PANEL -->
+    <aside class="hidden md:flex w-64 bg-slate-800 border-l border-slate-700 flex-col justify-between shrink-0 z-10 overflow-y-auto p-4 space-y-4">
+      <div>
+        <h2 class="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-3">Cor & HEX</h2>
+        <div class="space-y-2 bg-slate-900/60 p-2.5 rounded-xl border border-slate-700">
+          <div class="flex items-center space-x-3">
+            <div class="relative w-10 h-10 shrink-0">
+              <input type="color" id="nativeColorPicker" value="#F43F5E" class="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10">
+              <div id="colorDisplay" class="w-full h-full rounded-lg border-2 border-slate-600 shadow-inner bg-rose-500 flex items-center justify-center">
+                <i class="fa-solid fa-palette text-white/60 text-xs"></i>
+              </div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <label class="text-[10px] text-slate-400 font-medium block">HEX</label>
+              <input type="text" id="hexInput" value="#F43F5E" maxlength="9" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 font-mono font-bold text-xs text-slate-200 uppercase focus:outline-none focus:border-indigo-500">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Paleta</h2>
+          <select id="paletteSelect" class="bg-slate-900 text-xs text-slate-300 border border-slate-700 rounded-lg p-1 focus:outline-none">
+            <option value="basic">Básica</option>
+            <option value="pastel">Pastel</option>
+            <option value="skin">Pele</option>
+            <option value="nature">Natureza</option>
+            <option value="neon">Neon</option>
+            <option value="vintage">Vintage</option>
+          </select>
+        </div>
+        <div id="colorSwatches" class="grid grid-cols-5 gap-2 pt-1"></div>
+      </div>
+
+      <div class="border-t border-slate-700/80 pt-3">
+        <h2 class="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-2">Recentes</h2>
+        <div id="recentColors" class="flex flex-wrap gap-1.5"></div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- MOBILE BOTTOM DRAWER & NAVIGATION BAR (< 768px) -->
+  <div class="md:hidden flex flex-col shrink-0 bg-slate-800 border-t border-slate-700 z-30">
+    
+    <!-- Collapsible Mobile Sheet -->
+    <div id="mobileDrawer" class="hidden max-h-60 overflow-y-auto border-b border-slate-700/80 bg-slate-850 p-3 space-y-3">
+      
+      <!-- Panel 1: Brushes List -->
+      <div id="panelBrushes" class="mobile-panel">
+        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Escolha a Ferramenta</p>
+        <div class="grid grid-cols-4 gap-2" id="mobileToolGrid"></div>
+      </div>
+
+      <!-- Panel 2: Colors Palette & Custom HEX -->
+      <div id="panelColors" class="mobile-panel hidden">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center space-x-2">
+            <input type="color" id="mobileColorPicker" value="#F43F5E" class="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0">
+            <input type="text" id="mobileHexInput" value="#F43F5E" maxlength="9" class="w-24 bg-slate-900 border border-slate-700 rounded px-2 py-1 font-mono text-xs uppercase text-slate-200">
+          </div>
+          <select id="mobilePaletteSelect" class="bg-slate-900 text-xs text-slate-300 border border-slate-700 rounded-lg px-2 py-1">
+            <option value="basic">Básica</option>
+            <option value="pastel">Pastel</option>
+            <option value="skin">Pele</option>
+            <option value="nature">Natureza</option>
+            <option value="neon">Neon</option>
+            <option value="vintage">Vintage</option>
+          </select>
+        </div>
+        <div id="mobileColorSwatches" class="flex overflow-x-auto space-x-2 py-1 no-scrollbar"></div>
+      </div>
+
+      <!-- Panel 3: Size & Settings -->
+      <div id="panelSettings" class="mobile-panel hidden space-y-3">
+        <div>
+          <div class="flex justify-between text-xs text-slate-300 mb-1">
+            <span>Tamanho do Traço</span>
+            <span id="mobileSizeVal" class="font-mono text-slate-400">14px</span>
+          </div>
+          <input type="range" id="mobileBrushSize" min="1" max="100" value="14" class="w-full accent-indigo-500 bg-slate-900 rounded-lg h-3">
+        </div>
+        <div>
+          <div class="flex justify-between text-xs text-slate-300 mb-1">
+            <span>Opacidade / Transparência</span>
+            <span id="mobileOpacityVal" class="font-mono text-slate-400">100%</span>
+          </div>
+          <input type="range" id="mobileBrushOpacity" min="5" max="100" value="100" class="w-full accent-indigo-500 bg-slate-900 rounded-lg h-3">
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Bottom Navigation Bar Tabs -->
+    <nav class="flex items-center justify-around py-1.5 px-2 bg-slate-900">
+      <button data-tab="brushes" class="mobile-tab-btn flex flex-col items-center justify-center p-2 text-indigo-400 min-w-[50px] min-h-[48px]">
+        <i class="fa-solid fa-paintbrush text-base"></i>
+        <span class="text-[10px] mt-1 font-medium">Pincéis</span>
+      </button>
+
+      <button data-tab="colors" class="mobile-tab-btn flex flex-col items-center justify-center p-2 text-slate-400 min-w-[50px] min-h-[48px]">
+        <div id="mobileActiveColorCircle" class="w-5 h-5 rounded-full border border-white shadow-sm bg-rose-500"></div>
+        <span class="text-[10px] mt-1 font-medium">Cores</span>
+      </button>
+
+      <button data-tab="settings" class="mobile-tab-btn flex flex-col items-center justify-center p-2 text-slate-400 min-w-[50px] min-h-[48px]">
+        <i class="fa-solid fa-sliders text-base"></i>
+        <span class="text-[10px] mt-1 font-medium">Ajustes</span>
+      </button>
+
+      <button id="mobileClearBtn" class="flex flex-col items-center justify-center p-2 text-rose-400 min-w-[50px] min-h-[48px]">
+        <i class="fa-solid fa-trash-can text-base"></i>
+        <span class="text-[10px] mt-1 font-medium">Limpar</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+      // --- CONFIGURATION FOR GITHUB PAGES SECURITY ---
+      const REQUIRED_MD5_HASH = 'eda7b8fa9c772c5da2d1b07959d2eb0c';
+      const MAX_ATTEMPTS = 5;
+      const LOCKOUT_DURATION_SECONDS = 300;
+
+      // Authentication State
+      const authModal = document.getElementById('authModal');
+      const authCard = document.getElementById('authCard');
+      const authForm = document.getElementById('authForm');
+      const passwordInput = document.getElementById('passwordInput');
+      const togglePasswordVisibility = document.getElementById('togglePasswordVisibility');
+      const loginBtn = document.getElementById('loginBtn');
+      const attemptsCounter = document.getElementById('attemptsCounter');
+      const authAlert = document.getElementById('authAlert');
+      const authAlertMsg = document.getElementById('authAlertMsg');
+      const authAlertIcon = document.getElementById('authAlertIcon');
+      const logoutBtn = document.getElementById('logoutBtn');
+
+      let lockoutTimerInterval = null;
+
+      function getFailedAttempts() {
+        return parseInt(localStorage.getItem('colori_failed_attempts') || '0', 10);
+      }
+      function setFailedAttempts(count) {
+        localStorage.setItem('colori_failed_attempts', count.toString());
+      }
+      function getLockoutTimestamp() {
+        return parseInt(localStorage.getItem('colori_lockout_time') || '0', 10);
+      }
+      function setLockoutTimestamp(timeMs) {
+        localStorage.setItem('colori_lockout_time', timeMs.toString());
+      }
+      function isSessionUnlocked() {
+        return sessionStorage.getItem('colori_unlocked') === 'true';
+      }
+      function setSessionUnlocked(status) {
+        if (status) sessionStorage.setItem('colori_unlocked', 'true');
+        else sessionStorage.removeItem('colori_unlocked');
+      }
+
+      function updateAuthUI() {
+        const lockoutTime = getLockoutTimestamp();
+        const now = Date.now();
+
+        if (lockoutTime > 0 && now < lockoutTime) {
+          enableLockoutState(Math.ceil((lockoutTime - now) / 1000));
+        } else {
+          if (lockoutTime > 0 && now >= lockoutTime) {
+            setFailedAttempts(0);
+            setLockoutTimestamp(0);
+          }
+          const remaining = Math.max(0, MAX_ATTEMPTS - getFailedAttempts());
+          attemptsCounter.textContent = `${remaining} / ${MAX_ATTEMPTS}`;
+          if (remaining === 0) {
+            setLockoutTimestamp(Date.now() + (LOCKOUT_DURATION_SECONDS * 1000));
+            enableLockoutState(LOCKOUT_DURATION_SECONDS);
+          } else {
+            disableLockoutState();
+          }
+        }
+      }
+
+      function enableLockoutState(secondsLeft) {
+        passwordInput.disabled = true;
+        loginBtn.disabled = true;
+        showAuthAlert(`Bloqueado por segurança. Tente em ${secondsLeft}s`, 'error');
+
+        if (lockoutTimerInterval) clearInterval(lockoutTimerInterval);
+        let countdown = secondsLeft;
+        lockoutTimerInterval = setInterval(() => {
+          countdown--;
+          if (countdown <= 0) {
+            clearInterval(lockoutTimerInterval);
+            setFailedAttempts(0);
+            setLockoutTimestamp(0);
+            disableLockoutState();
+            hideAuthAlert();
+            updateAuthUI();
+          } else {
+            showAuthAlert(`Bloqueado por segurança. Tente em ${countdown}s`, 'error');
+          }
+        }, 1000);
+      }
+
+      function disableLockoutState() {
+        if (lockoutTimerInterval) clearInterval(lockoutTimerInterval);
+        passwordInput.disabled = false;
+        loginBtn.disabled = false;
+      }
+
+      function showAuthAlert(msg, type = 'error') {
+        authAlert.classList.remove('hidden', 'bg-rose-500/20', 'border-rose-500/40', 'text-rose-300', 'bg-emerald-500/20', 'border-emerald-500/40', 'text-emerald-300');
+        authAlert.classList.add('border');
+
+        if (type === 'error') {
+          authAlert.classList.add('bg-rose-500/20', 'border-rose-500/40', 'text-rose-300');
+          authAlertIcon.className = 'fa-solid fa-triangle-exclamation text-rose-400 text-sm shrink-0';
+        } else {
+          authAlert.classList.add('bg-emerald-500/20', 'border-emerald-500/40', 'text-emerald-300');
+          authAlertIcon.className = 'fa-solid fa-circle-check text-emerald-400 text-sm shrink-0';
+        }
+        authAlertMsg.textContent = msg;
+      }
+
+      function hideAuthAlert() {
+        authAlert.classList.add('hidden');
+      }
+
+      function verifyPassword() {
+        if (passwordInput.disabled) return;
+        const enteredPass = passwordInput.value.trim();
+        if (!enteredPass) {
+          showAuthAlert('Por favor, digite a senha de acesso.');
+          return;
+        }
+
+        if (SparkMD5.hash(enteredPass) === REQUIRED_MD5_HASH) {
+          showAuthAlert('Senha correta! Acessando...', 'success');
+          setSessionUnlocked(true);
+          setFailedAttempts(0);
+          setLockoutTimestamp(0);
+          setTimeout(() => {
+            authModal.classList.add('hidden');
+            passwordInput.value = '';
+          }, 500);
+        } else {
+          const newFailed = getFailedAttempts() + 1;
+          setFailedAttempts(newFailed);
+          passwordInput.value = '';
+          showAuthAlert(`Senha incorreta! (${MAX_ATTEMPTS - newFailed} tentativas restantes)`);
+          updateAuthUI();
+        }
+      }
+
+      function checkAuthOnLoad() {
+        if (isSessionUnlocked()) authModal.classList.add('hidden');
+        else {
+          authModal.classList.remove('hidden');
+          updateAuthUI();
+        }
+      }
+
+      togglePasswordVisibility.addEventListener('click', () => {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+        togglePasswordVisibility.querySelector('i').className = type === 'password' ? 'fa-solid fa-eye text-sm' : 'fa-solid fa-eye-slash text-sm';
+      });
+
+      authForm.addEventListener('submit', verifyPassword);
+      logoutBtn.addEventListener('click', () => {
+        if (confirm('Deseja bloquear o aplicativo?')) {
+          setSessionUnlocked(false);
+          checkAuthOnLoad();
+        }
+      });
+
+      // --- APP TOOL DEFINITIONS ---
+      const TOOLS = [
+        { id: 'fill', name: 'Balde', icon: 'fa-fill-drip', color: 'text-cyan-400' },
+        { id: 'brush', name: 'Pincel', icon: 'fa-paint-brush', color: 'text-emerald-400' },
+        { id: 'crayon', name: 'Giz Cera', icon: 'fa-pencil', color: 'text-amber-400' },
+        { id: 'watercolor', name: 'Aquarela', icon: 'fa-droplet', color: 'text-blue-400' },
+        { id: 'spray', name: 'Spray', icon: 'fa-spray-can', color: 'text-teal-400' },
+        { id: 'rainbow', name: 'Arco-Íris', icon: 'fa-rainbow', color: 'text-pink-400' },
+        { id: 'glow', name: 'Neon', icon: 'fa-wand-magic-sparkles', color: 'text-yellow-300' },
+        { id: 'eraser', name: 'Borracha', icon: 'fa-eraser', color: 'text-rose-400' },
+        { id: 'picker', name: 'Conta-gotas', icon: 'fa-eye-dropper', color: 'text-indigo-400' },
+        { id: 'pan', name: 'Navegar', icon: 'fa-hand', color: 'text-amber-400' }
+      ];
+
+      // --- APPLICATION STATE ---
+      const state = {
+        tool: 'fill',
+        currentColor: '#F43F5E',
+        rainbowHue: 0,
+        brushSize: 14,
+        opacity: 1.0,
+        fillTolerance: 32,
+        zoom: 1.0,
+        panX: 0,
+        panY: 0,
+        isPanning: false,
+        isDrawing: false,
+        startPan: { x: 0, y: 0 },
+        lastPoint: null,
+        
+        // Multi-touch pinch zoom state
+        touchStartDist: 0,
+        touchStartZoom: 1.0,
+
+        // Line Filters
+        renderMode: 'lineart',
+        lineThreshold: 110,
+
+        // History Stack
+        undoStack: [],
+        redoStack: [],
+        maxHistory: 15,
+
+        originalImage: null,
+        recentColors: []
+      };
+
+      const PALETTES = {
+        basic: ['#000000', '#FFFFFF', '#EF4444', '#F97316', '#F59E0B', '#84CC16', '#10B981', '#06B6D4', '#3B82F6', '#6366F1', '#A855F7', '#EC4899', '#78350F'],
+        pastel: ['#FECDD3', '#FED7AA', '#FEF08A', '#D9F99D', '#A7F3D0', '#BAE6FD', '#C7D2FE', '#E9D5FF', '#FBCFE8', '#F5D0FE'],
+        skin: ['#FFF1E6', '#FDE2E4', '#FDD2B5', '#F7B089', '#E89862', '#C67843', '#9E532B', '#7A3B1a', '#542611'],
+        nature: ['#15803D', '#22C55E', '#86EFAC', '#155E75', '#0284C7', '#38BDF8', '#B45309', '#D97706', '#FBBF24'],
+        neon: ['#FF0055', '#FF5000', '#FFCC00', '#00FF66', '#00FFFF', '#0066FF', '#9900FF', '#FF00CC', '#FFFFFF'],
+        vintage: ['#2B2D42', '#8D99AE', '#EDF2F4', '#EF233C', '#D90429', '#3D5A80', '#98C1D9', '#EE6C4D']
+      };
+
+      // --- DOM ELEMENTS ---
+      const colorCanvas = document.getElementById('colorCanvas');
+      const colorCtx = colorCanvas.getContext('2d', { willReadFrequently: true });
+      const lineCanvas = document.getElementById('lineCanvas');
+      const lineCtx = lineCanvas.getContext('2d', { willReadFrequently: true });
+      
+      const canvasContainer = document.getElementById('canvasContainer');
+      const canvasViewport = document.getElementById('canvasViewport');
+      const loader = document.getElementById('loader');
+
+      const imageInput = document.getElementById('imageInput');
+      const nativeColorPicker = document.getElementById('nativeColorPicker');
+      const mobileColorPicker = document.getElementById('mobileColorPicker');
+      const colorDisplay = document.getElementById('colorDisplay');
+      const mobileActiveColorCircle = document.getElementById('mobileActiveColorCircle');
+      const hexInput = document.getElementById('hexInput');
+      const mobileHexInput = document.getElementById('mobileHexInput');
+      const colorSwatches = document.getElementById('colorSwatches');
+      const mobileColorSwatches = document.getElementById('mobileColorSwatches');
+
+      const zoomLevelText = document.getElementById('zoomLevel');
+      const undoBtn = document.getElementById('undoBtn');
+      const redoBtn = document.getElementById('redoBtn');
+      const resetZoomBtn = document.getElementById('resetZoomBtn');
+      const downloadBtn = document.getElementById('downloadBtn');
+
+      // --- INITIALIZATION ---
+      function init() {
+        checkAuthOnLoad();
+        buildToolGrids();
+        renderPalette('basic');
+        setupEventListeners();
+        loadSampleTemplate('mandala');
+      }
+
+      function buildToolGrids() {
+        const desktopGrid = document.getElementById('desktopToolGrid');
+        const mobileGrid = document.getElementById('mobileToolGrid');
+        
+        desktopGrid.innerHTML = '';
+        mobileGrid.innerHTML = '';
+
+        TOOLS.forEach(t => {
+          // Desktop Button
+          const dBtn = document.createElement('button');
+          dBtn.dataset.tool = t.id;
+          dBtn.className = `tool-btn w-full p-2.5 rounded-xl bg-slate-700/60 hover:bg-slate-700 flex items-center space-x-2.5 text-slate-200 transition min-h-[44px] ${state.tool === t.id ? 'active' : ''}`;
+          dBtn.innerHTML = `<i class="fa-solid ${t.icon} text-base ${t.color}"></i><span class="text-xs font-medium">${t.name}</span>`;
+          dBtn.onclick = () => setTool(t.id);
+          desktopGrid.appendChild(dBtn);
+
+          // Mobile Button
+          const mBtn = document.createElement('button');
+          mBtn.dataset.tool = t.id;
+          mBtn.className = `tool-btn p-2 rounded-xl bg-slate-800 border border-slate-700 flex flex-col items-center justify-center text-slate-200 min-h-[50px] ${state.tool === t.id ? 'active' : ''}`;
+          mBtn.innerHTML = `<i class="fa-solid ${t.icon} text-base ${t.color}"></i><span class="text-[10px] mt-1">${t.name}</span>`;
+          mBtn.onclick = () => {
+            setTool(t.id);
+            document.getElementById('mobileDrawer').classList.add('hidden');
+          };
+          mobileGrid.appendChild(mBtn);
+        });
+      }
+
+      function renderPalette(key) {
+        colorSwatches.innerHTML = '';
+        mobileColorSwatches.innerHTML = '';
+        const colors = PALETTES[key] || PALETTES.basic;
+
+        colors.forEach(hex => {
+          const btn = document.createElement('button');
+          btn.className = 'w-8 h-8 rounded-xl border border-slate-600 shadow-sm transition active:scale-95 shrink-0 min-w-[36px] min-h-[36px]';
+          btn.style.backgroundColor = hex;
+          btn.onclick = () => setColor(hex);
+
+          colorSwatches.appendChild(btn.cloneNode(true));
+          
+          const mBtn = btn.cloneNode(true);
+          mBtn.onclick = () => setColor(hex);
+          mobileColorSwatches.appendChild(mBtn);
+        });
+      }
+
+      function setColor(hex) {
+        let cleanHex = hex.trim();
+        if (!cleanHex.startsWith('#')) cleanHex = '#' + cleanHex;
+        if (!/^#[0-9A-F]{6}$/i.test(cleanHex)) return;
+
+        state.currentColor = cleanHex.toUpperCase();
+        nativeColorPicker.value = state.currentColor;
+        mobileColorPicker.value = state.currentColor;
+        colorDisplay.style.backgroundColor = state.currentColor;
+        mobileActiveColorCircle.style.backgroundColor = state.currentColor;
+        hexInput.value = state.currentColor;
+        mobileHexInput.value = state.currentColor;
+      }
+
+      // --- TEMPLATES & IMAGE LOADING ---
+      function loadSampleTemplate(type) {
+        showLoader(true);
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = 1000;
+        tempCanvas.height = 1000;
+        const ctx = tempCanvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, 1000, 1000);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 4;
+
+        if (type === 'mandala') {
+          for (let r = 50; r <= 420; r += 60) {
+            ctx.beginPath(); ctx.arc(500, 500, r, 0, Math.PI * 2); ctx.stroke();
+          }
+          for (let i = 0; i < 12; i++) {
+            const a = (i * Math.PI) / 6;
+            ctx.beginPath(); ctx.moveTo(500, 500); ctx.lineTo(500 + Math.cos(a) * 420, 500 + Math.sin(a) * 420); ctx.stroke();
+          }
+        } else if (type === 'landscape') {
+          ctx.beginPath(); ctx.arc(500, 300, 120, 0, Math.PI * 2); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(0, 700); ctx.lineTo(300, 350); ctx.lineTo(600, 700); ctx.lineTo(1000, 400); ctx.lineTo(1000, 1000); ctx.lineTo(0, 1000); ctx.closePath(); ctx.stroke();
+        } else if (type === 'cat') {
+          ctx.beginPath(); ctx.arc(500, 450, 200, 0, Math.PI * 2); ctx.stroke();
+          ctx.beginPath(); ctx.arc(420, 420, 30, 0, Math.PI * 2); ctx.stroke();
+          ctx.beginPath(); ctx.arc(580, 420, 30, 0, Math.PI * 2); ctx.stroke();
+        }
+
+        const img = new Image();
+        img.onload = () => { setupCanvasImage(img); showLoader(false); };
+        img.src = tempCanvas.toDataURL();
+      }
+
+      function handleFileUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        showLoader(true);
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const img = new Image();
+          img.onload = () => { setupCanvasImage(img); showLoader(false); };
+          img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function setupCanvasImage(img) {
+        state.originalImage = img;
+        let w = img.width, h = img.height;
+        const maxDim = 1200;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+          else { w = Math.round((w * maxDim) / h); h = maxDim; }
+        }
+
+        colorCanvas.width = w;
+        colorCanvas.height = h;
+        lineCanvas.width = w;
+        lineCanvas.height = h;
+
+        document.getElementById('canvasDimensions').textContent = `${w}x${h}`;
+
+        colorCtx.fillStyle = '#FFFFFF';
+        colorCtx.fillRect(0, 0, w, h);
+
+        processLineArt();
+        state.undoStack = [];
+        state.redoStack = [];
+        saveState();
+        resetZoom();
+      }
+
+      function processLineArt() {
+        if (!state.originalImage) return;
+        const w = lineCanvas.width, h = lineCanvas.height;
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = w; tempCanvas.height = h;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(state.originalImage, 0, 0, w, h);
+
+        const imgData = tempCtx.getImageData(0, 0, w, h);
+        const data = imgData.data;
+        const outData = lineCtx.createImageData(w, h);
+        const outPixels = outData.data;
+
+        const gray = new Uint8ClampedArray(w * h);
+        for (let i = 0; i < data.length; i += 4) {
+          gray[i / 4] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        }
+
+        const threshold = parseInt(state.lineThreshold);
+        for (let y = 1; y < h - 1; y++) {
+          for (let x = 1; x < w - 1; x++) {
+            const idx = y * w + x;
+            const gx = -1 * gray[idx - w - 1] + 1 * gray[idx - w + 1] + -2 * gray[idx - 1] + 2 * gray[idx + 1] + -1 * gray[idx + w - 1] + 1 * gray[idx + w + 1];
+            const gy = -1 * gray[idx - w - 1] - 2 * gray[idx - w] - 1 * gray[idx - w + 1] + 1 * gray[idx + w - 1] + 2 * gray[idx + w] + 1 * gray[idx + w + 1];
+            const mag = Math.sqrt(gx * gx + gy * gy) * 2;
+            const pxIdx = idx * 4;
+
+            const val = (mag > (255 - threshold)) ? 0 : 255;
+            outPixels[pxIdx] = val; outPixels[pxIdx + 1] = val; outPixels[pxIdx + 2] = val;
+            outPixels[pxIdx + 3] = val === 255 ? 0 : 255;
+          }
+        }
+        lineCtx.putImageData(outData, 0, 0);
+      }
+
+      // --- FLOOD FILL ---
+      function floodFill(startX, startY, fillColorHex, tolerance) {
+        const w = colorCanvas.width, h = colorCanvas.height;
+        const combinedCanvas = document.createElement('canvas');
+        combinedCanvas.width = w; combinedCanvas.height = h;
+        const combinedCtx = combinedCanvas.getContext('2d');
+        combinedCtx.drawImage(colorCanvas, 0, 0);
+        combinedCtx.drawImage(lineCanvas, 0, 0);
+
+        const combinedData = combinedCtx.getImageData(0, 0, w, h);
+        const colorData = colorCtx.getImageData(0, 0, w, h);
+
+        const targetIdx = (startY * w + startX) * 4;
+        const targetR = combinedData.data[targetIdx], targetG = combinedData.data[targetIdx + 1], targetB = combinedData.data[targetIdx + 2], targetA = combinedData.data[targetIdx + 3];
+
+        if (targetR < 50 && targetG < 50 && targetB < 50 && targetA > 200) return;
+
+        const fillRgb = hexToRgb(fillColorHex);
+        const pixelStack = [[startX, startY]];
+        const visited = new Uint8Array(w * h);
+
+        while (pixelStack.length > 0) {
+          const [x, y] = pixelStack.pop();
+          const idx = y * w + x;
+          if (x < 0 || x >= w || y < 0 || y >= h || visited[idx]) continue;
+
+          const pIdx = idx * 4;
+          if (colorMatch(combinedData.data[pIdx], combinedData.data[pIdx + 1], combinedData.data[pIdx + 2], combinedData.data[pIdx + 3], targetR, targetG, targetB, targetA, tolerance)) {
+            visited[idx] = 1;
+            colorData.data[pIdx] = fillRgb.r;
+            colorData.data[pIdx + 1] = fillRgb.g;
+            colorData.data[pIdx + 2] = fillRgb.b;
+            colorData.data[pIdx + 3] = 255;
+
+            pixelStack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+          }
+        }
+        colorCtx.putImageData(colorData, 0, 0);
+        saveState();
+      }
+
+      function colorMatch(r1, g1, b1, a1, r2, g2, b2, a2, tol) {
+        return Math.abs(r1 - r2) <= tol && Math.abs(g1 - g2) <= tol && Math.abs(b1 - b2) <= tol;
+      }
+
+      function hexToRgb(hex) {
+        const res = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return res ? { r: parseInt(res[1], 16), g: parseInt(res[2], 16), b: parseInt(res[3], 16) } : { r: 0, g: 0, b: 0 };
+      }
+
+      // --- TOUCH & CANVAS INPUT HANDLING ---
+      function getCanvasCoordinates(e) {
+        const rect = colorCanvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        const scaleX = colorCanvas.width / rect.width;
+        const scaleY = colorCanvas.height / rect.height;
+
+        return {
+          x: Math.floor((clientX - rect.left) * scaleX),
+          y: Math.floor((clientY - rect.top) * scaleY)
+        };
+      }
+
+      function startAction(e) {
+        if (!isSessionUnlocked()) return;
+
+        // Two-Finger Pinch Zoom Detection
+        if (e.touches && e.touches.length === 2) {
+          state.isDrawing = false;
+          state.isPanning = false;
+          state.touchStartDist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+          state.touchStartZoom = state.zoom;
+          return;
+        }
+
+        const pt = getCanvasCoordinates(e);
+
+        if (state.tool === 'pan') {
+          state.isPanning = true;
+          const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+          const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+          state.startPan = { x: clientX - state.panX, y: clientY - state.panY };
+          return;
+        }
+
+        if (state.tool === 'fill') {
+          floodFill(pt.x, pt.y, state.currentColor, state.fillTolerance);
+          return;
+        }
+
+        state.isDrawing = true;
+        state.lastPoint = pt;
+        drawStroke(pt);
+      }
+
+      function moveAction(e) {
+        if (!isSessionUnlocked()) return;
+
+        // Multi-touch Zooming
+        if (e.touches && e.touches.length === 2) {
+          const currentDist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+          if (state.touchStartDist > 0) {
+            setZoom(state.touchStartZoom * (currentDist / state.touchStartDist));
+          }
+          return;
+        }
+
+        if (state.isPanning) {
+          const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+          const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+          state.panX = clientX - state.startPan.x;
+          state.panY = clientY - state.startPan.y;
+          updateViewportTransform();
+          return;
+        }
+
+        if (!state.isDrawing) return;
+        const pt = getCanvasCoordinates(e);
+        drawStroke(pt);
+        state.lastPoint = pt;
+      }
+
+      function endAction() {
+        if (state.isDrawing) {
+          state.isDrawing = false;
+          saveState();
+        }
+        state.isPanning = false;
+        state.touchStartDist = 0;
+      }
+
+      function drawStroke(p2) {
+        const p1 = state.lastPoint;
+        colorCtx.save();
+        colorCtx.beginPath();
+        colorCtx.moveTo(p1.x, p1.y);
+        colorCtx.lineTo(p2.x, p2.y);
+        colorCtx.lineCap = 'round';
+        colorCtx.lineJoin = 'round';
+
+        if (state.tool === 'eraser') {
+          colorCtx.strokeStyle = '#FFFFFF';
+          colorCtx.lineWidth = state.brushSize * 1.5;
+          colorCtx.stroke();
+        } else if (state.tool === 'brush') {
+          colorCtx.strokeStyle = state.currentColor;
+          colorCtx.globalAlpha = state.opacity;
+          colorCtx.lineWidth = state.brushSize;
+          colorCtx.stroke();
+        } else if (state.tool === 'rainbow') {
+          state.rainbowHue = (state.rainbowHue + 4) % 360;
+          colorCtx.strokeStyle = `hsl(${state.rainbowHue}, 90%, 55%)`;
+          colorCtx.lineWidth = state.brushSize;
+          colorCtx.stroke();
+        }
+        colorCtx.restore();
+      }
+
+      // --- HISTORY (UNDO/REDO) ---
+      function saveState() {
+        if (state.undoStack.length >= state.maxHistory) state.undoStack.shift();
+        state.undoStack.push(colorCtx.getImageData(0, 0, colorCanvas.width, colorCanvas.height));
+        state.redoStack = [];
+        updateUndoButtons();
+      }
+
+      function undo() {
+        if (state.undoStack.length > 1) {
+          state.redoStack.push(state.undoStack.pop());
+          colorCtx.putImageData(state.undoStack[state.undoStack.length - 1], 0, 0);
+          updateUndoButtons();
+        }
+      }
+
+      function redo() {
+        if (state.redoStack.length > 0) {
+          const next = state.redoStack.pop();
+          state.undoStack.push(next);
+          colorCtx.putImageData(next, 0, 0);
+          updateUndoButtons();
+        }
+      }
+
+      function updateUndoButtons() {
+        undoBtn.disabled = state.undoStack.length <= 1;
+        redoBtn.disabled = state.redoStack.length === 0;
+      }
+
+      // --- ZOOM & PAN ---
+      function setZoom(newZoom) {
+        state.zoom = Math.max(0.2, Math.min(4.0, newZoom));
+        zoomLevelText.textContent = `${Math.round(state.zoom * 100)}%`;
+        updateViewportTransform();
+      }
+
+      function resetZoom() {
+        const containerRect = canvasContainer.getBoundingClientRect();
+        const totalW = colorCanvas.width + 24;
+        const totalH = colorCanvas.height + 36;
+
+        const scale = Math.min((containerRect.width - 20) / totalW, (containerRect.height - 20) / totalH);
+        state.zoom = scale > 0 ? scale : 1.0;
+        state.panX = (containerRect.width - totalW * state.zoom) / 2;
+        state.panY = (containerRect.height - totalH * state.zoom) / 2;
+        
+        zoomLevelText.textContent = `${Math.round(state.zoom * 100)}%`;
+        updateViewportTransform();
+      }
+
+      function updateViewportTransform() {
+        canvasViewport.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+      }
+
+      function setTool(id) {
+        state.tool = id;
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+          if (btn.dataset.tool === id) btn.classList.add('active');
+          else btn.classList.remove('active');
+        });
+      }
+
+      function showLoader(visible) {
+        loader.classList.toggle('hidden', !visible);
+      }
+
+      // --- EVENT LISTENERS ---
+      function setupEventListeners() {
+        // Mobile Navigation Tabs
+        document.querySelectorAll('.mobile-tab-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const tab = btn.dataset.tab;
+            const drawer = document.getElementById('mobileDrawer');
+            
+            if (drawer.classList.contains('hidden')) {
+              drawer.classList.remove('hidden');
+            }
+
+            document.querySelectorAll('.mobile-panel').forEach(p => p.classList.add('hidden'));
+            if (tab === 'brushes') document.getElementById('panelBrushes').classList.remove('hidden');
+            if (tab === 'colors') document.getElementById('panelColors').classList.remove('hidden');
+            if (tab === 'settings') document.getElementById('panelSettings').classList.remove('hidden');
+          });
+        });
+
+        // Touch Canvas Listeners
+        canvasContainer.addEventListener('mousedown', startAction);
+        window.addEventListener('mousemove', moveAction);
+        window.addEventListener('mouseup', endAction);
+
+        canvasContainer.addEventListener('touchstart', startAction, { passive: false });
+        window.addEventListener('touchmove', moveAction, { passive: false });
+        window.addEventListener('touchend', endAction);
+
+        // Mobile Sliders sync
+        const mobileBrushSize = document.getElementById('mobileBrushSize');
+        mobileBrushSize.addEventListener('input', (e) => {
+          state.brushSize = parseInt(e.target.value);
+          document.getElementById('mobileSizeVal').textContent = `${state.brushSize}px`;
+          document.getElementById('brushSizeVal').textContent = `${state.brushSize}px`;
+        });
+
+        const mobileBrushOpacity = document.getElementById('mobileBrushOpacity');
+        mobileBrushOpacity.addEventListener('input', (e) => {
+          state.opacity = parseInt(e.target.value) / 100;
+          document.getElementById('mobileOpacityVal').textContent = `${e.target.value}%`;
+        });
+
+        // Desktop Sliders
+        document.getElementById('brushSize').addEventListener('input', (e) => {
+          state.brushSize = parseInt(e.target.value);
+          document.getElementById('brushSizeVal').textContent = `${state.brushSize}px`;
+        });
+
+        // Color Inputs
+        nativeColorPicker.addEventListener('input', (e) => setColor(e.target.value));
+        mobileColorPicker.addEventListener('input', (e) => setColor(e.target.value));
+        hexInput.addEventListener('input', (e) => setColor(e.target.value));
+        mobileHexInput.addEventListener('input', (e) => setColor(e.target.value));
+
+        document.getElementById('paletteSelect').addEventListener('change', (e) => renderPalette(e.target.value));
+        document.getElementById('mobilePaletteSelect').addEventListener('change', (e) => renderPalette(e.target.value));
+
+        // Toolbar Buttons
+        imageInput.addEventListener('change', handleFileUpload);
+        undoBtn.addEventListener('click', undo);
+        redoBtn.addEventListener('click', redo);
+        resetZoomBtn.addEventListener('click', resetZoom);
+        downloadBtn.addEventListener('click', () => {
+          const exportCanvas = document.createElement('canvas');
+          exportCanvas.width = colorCanvas.width;
+          exportCanvas.height = colorCanvas.height;
+          const ctx = exportCanvas.getContext('2d');
+          ctx.drawImage(colorCanvas, 0, 0);
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.drawImage(lineCanvas, 0, 0);
+
+          const a = document.createElement('a');
+          a.download = 'minha-arte-colorida.png';
+          a.href = exportCanvas.toDataURL();
+          a.click();
+        });
+
+        document.getElementById('mobileClearBtn').addEventListener('click', () => {
+          if (confirm("Limpar pintura?")) {
+            colorCtx.fillStyle = '#FFFFFF';
+            colorCtx.fillRect(0, 0, colorCanvas.width, colorCanvas.height);
+            saveState();
+          }
+        });
+
+        // Template Selector
+        const templateBtn = document.getElementById('templateBtn');
+        const templateMenu = document.getElementById('templateMenu');
+        templateBtn.addEventListener('click', () => templateMenu.classList.toggle('hidden'));
+        document.querySelectorAll('[data-template]').forEach(i => {
+          i.addEventListener('click', (e) => {
+            loadSampleTemplate(e.currentTarget.dataset.template);
+            templateMenu.classList.add('hidden');
+          });
+        });
+
+        window.addEventListener('resize', resetZoom);
+      }
+
+      init();
+    });
+  </script>
+</body>
+</html>
