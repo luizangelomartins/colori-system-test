@@ -1,6 +1,12 @@
-
+Mini estúdio digital web interativo para colorir e converter fotos em esboços de contorno, desenvolvido com Tailwind JS, HTML5 Canvas e suporte a múltiplos modos de pintura.
 <div align="center">
   <hr width="500em" />
+</div>
+
+<div align="center">
+  <td align="center">
+    <img height="45" src="https://img.shields.io/badge/FEITO%20POR%20DISPOSITIVO%20MOBILE-1F1F1F?style=for-the-badge&logo=readme&logoColor=white"><br>
+  </td>
 </div>
 
 <div align="center">
