@@ -1,4 +1,4 @@
-Mini estúdio digital web interativo para colorir e converter fotos em esboços de contorno, desenvolvido com Tailwind JS, HTML5 Canvas e suporte a múltiplos modos de pintura.
+
 <div align="center">
   <hr width="500em" />
 </div>
