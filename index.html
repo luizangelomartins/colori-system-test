@@ -86,7 +86,7 @@
                 padding: 0.35rem 0.5rem;
                 gap: 0.25rem;
             }
-            
+
             header h1 {
                 font-size: 0.85rem;
             }
@@ -186,10 +186,34 @@
         </div>
 
         <div class="flex items-center gap-1.5 sm:gap-2">
-            <label class="cursor-pointer bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg transition flex items-center gap-1.5 border border-slate-600">
+            <label class="cursor-pointer bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg transition flex items-center gap-1.5 border border-slate-600" title="Carregar foto para desenhar">
                 <i class="fa-solid fa-upload text-indigo-400"></i>
                 <span class="hidden sm:inline">Carregar Foto</span>
                 <input type="file" id="imageLoader" accept="image/*" class="hidden">
+            </label>
+
+            <!-- Carregar Imagem Original/Referência -->
+            <label id="refUploadLabel" class="cursor-pointer bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg transition flex items-center gap-1.5 border border-slate-600" title="Carregar imagem original separada para conferência">
+                <i class="fa-solid fa-image text-emerald-400"></i>
+                <span class="hidden sm:inline">Foto Original</span>
+                <input type="file" id="referenceImageLoader" accept="image/*" class="hidden">
+            </label>
+
+            <!-- Botão do Olho (Visualizar Referência) -->
+            <button id="toggleOriginalBtn" onclick="toggleOriginalView()" class="p-2 bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition border border-slate-600 relative opacity-50 cursor-not-allowed" title="Mostra/Oculta a imagem original (Carregue uma referência primeiro)" disabled>
+                <i id="eyeIcon" class="fa-solid fa-eye-slash"></i>
+            </button>
+
+            <!-- Salvar e Carregar Projeto (.json) -->
+            <button onclick="saveProjectFile()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm" title="Salvar Projeto em Arquivo">
+                <i class="fa-solid fa-file-arrow-down"></i>
+                <span class="hidden sm:inline">Salvar Projeto</span>
+            </button>
+
+            <label class="cursor-pointer bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg transition flex items-center gap-1.5 border border-slate-600" title="Carregar Projeto Salvo">
+                <i class="fa-solid fa-file-arrow-up text-indigo-400"></i>
+                <span class="hidden sm:inline">Carregar Projeto</span>
+                <input type="file" id="projectLoader" accept=".json" class="hidden">
             </label>
 
             <button id="undoBtn" onclick="undo()" class="p-2 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition disabled:opacity-30" title="Desfazer (Ctrl+Z)">
@@ -204,7 +228,7 @@
             <button onclick="clearPaintLayer()" class="p-2 text-amber-400 hover:bg-amber-950/40 rounded-lg transition" title="Limpar Cores">
                 <i class="fa-solid fa-eraser"></i>
             </button>
-            <button onclick="exportCanvas()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm">
+            <button onclick="exportCanvas()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm" title="Salvar Imagem Final (PNG)">
                 <i class="fa-solid fa-download"></i>
                 <span class="hidden sm:inline">Salvar Arte</span>
             </button>
@@ -316,6 +340,7 @@
             
             <div id="frameWrapper" class="photo-frame-container cursor-grab">
                 <div id="canvasStack" class="relative overflow-hidden bg-white">
+                    <img id="bgOriginalImg" class="absolute top-0 left-0 w-full h-full object-cover pointer-events-none z-10" style="display: none;" alt="Original">
                     <canvas id="paintCanvas" class="absolute top-0 left-0"></canvas>
                     <canvas id="lineCanvas" class="relative top-0 left-0 pointer-events-none" style="mix-blend-mode: multiply;"></canvas>
                 </div>
@@ -407,6 +432,8 @@
 
         let paintCanvas, paintCtx, lineCanvas, lineCtx;
         let loadedImage = null;
+        let hasReferenceImage = false;
+        let isShowingOriginal = false;
 
         let zoomScale = 1.0;
         let panX = 0, panY = 0;
@@ -498,7 +525,8 @@
             loadPalette('basic');
             renderRecentColors();
             setupCanvasEvents();
-            setupImageLoader();
+            setupImageLoaders();
+            setupProjectLoader();
 
             loadDefaultImageFromFile();
             setTool('pan');
@@ -533,7 +561,6 @@
 
         function applyTransform() {
             const frame = document.getElementById('frameWrapper');
-            // Usamos transformações centralizadas para garantir movimentação perfeita sem "sumir" da tela
             frame.style.transform = `translate(calc(-50% + ${panX}px), calc(-50% + ${panY}px)) scale(${zoomScale})`;
             document.getElementById('zoomVal').innerText = `${Math.round(zoomScale * 100)}%`;
         }
@@ -541,7 +568,7 @@
         function zoomIn() { zoomScale = Math.min(zoomScale * 1.2, 5.0); applyTransform(); }
         function zoomOut() { zoomScale = Math.max(zoomScale / 1.2, 0.2); applyTransform(); }
 
-        function setupImageLoader() {
+        function setupImageLoaders() {
             document.getElementById('imageLoader').addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -565,6 +592,122 @@
                 };
                 reader.readAsDataURL(file);
             });
+
+            document.getElementById('referenceImageLoader').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const bgImg = document.getElementById('bgOriginalImg');
+                    bgImg.src = event.target.result;
+                    hasReferenceImage = true;
+                    
+                    const toggleBtn = document.getElementById('toggleOriginalBtn');
+                    toggleBtn.disabled = false;
+                    toggleBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    toggleBtn.classList.add('bg-slate-700', 'hover:bg-slate-600');
+                    
+                    const refLabel = document.getElementById('refUploadLabel');
+                    refLabel.classList.remove('bg-slate-700/50');
+                    refLabel.classList.add('bg-emerald-600/20', 'border-emerald-500', 'text-emerald-300');
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function saveProjectFile() {
+            const projectData = {
+                width: paintCanvas.width,
+                height: paintCanvas.height,
+                paintData: paintCanvas.toDataURL('image/png'),
+                lineData: lineCanvas.toDataURL('image/png'),
+                referenceData: hasReferenceImage ? document.getElementById('bgOriginalImg').src : null,
+                hasReference: hasReferenceImage
+            };
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(projectData));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "coloristudio-projeto.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function setupProjectLoader() {
+            document.getElementById('projectLoader').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const projectData = JSON.parse(event.target.result);
+                        
+                        setCanvasDimensions(projectData.width, projectData.height);
+
+                        const paintImg = new Image();
+                        paintImg.onload = () => {
+                            paintCtx.clearRect(0, 0, paintCanvas.width, paintCanvas.height);
+                            paintCtx.drawImage(paintImg, 0, 0);
+                        };
+                        paintImg.src = projectData.paintData;
+
+                        const lineImg = new Image();
+                        lineImg.onload = () => {
+                            lineCtx.clearRect(0, 0, lineCanvas.width, lineCanvas.height);
+                            lineCtx.drawImage(lineImg, 0, 0);
+                        };
+                        lineImg.src = projectData.lineData;
+
+                        if (projectData.hasReference && projectData.referenceData) {
+                            const bgImg = document.getElementById('bgOriginalImg');
+                            bgImg.src = projectData.referenceData;
+                            hasReferenceImage = true;
+
+                            const toggleBtn = document.getElementById('toggleOriginalBtn');
+                            toggleBtn.disabled = false;
+                            toggleBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                            toggleBtn.classList.add('bg-slate-700', 'hover:bg-slate-600');
+
+                            const refLabel = document.getElementById('refUploadLabel');
+                            refLabel.classList.remove('bg-slate-700/50');
+                            refLabel.classList.add('bg-emerald-600/20', 'border-emerald-500', 'text-emerald-300');
+                        }
+
+                        undoStack = [];
+                        redoStack = [];
+                        document.getElementById('undoBtn').disabled = true;
+                        document.getElementById('redoBtn').disabled = true;
+
+                        alert('Projeto carregado com sucesso!');
+                    } catch (err) {
+                        console.error('Erro ao carregar arquivo de projeto:', err);
+                        alert('Erro ao carregar o arquivo de projeto. Certifique-se de que é um arquivo .json válido.');
+                    }
+                };
+                reader.readAsText(file);
+            });
+        }
+
+        function toggleOriginalView() {
+            if (!hasReferenceImage) return;
+
+            isShowingOriginal = !isShowingOriginal;
+            const bgImg = document.getElementById('bgOriginalImg');
+            const eyeIcon = document.getElementById('eyeIcon');
+            const toggleBtn = document.getElementById('toggleOriginalBtn');
+
+            if (isShowingOriginal) {
+                bgImg.style.display = 'block';
+                eyeIcon.className = 'fa-solid fa-eye';
+                toggleBtn.classList.add('bg-indigo-600', 'border-indigo-500', 'text-white');
+            } else {
+                bgImg.style.display = 'none';
+                eyeIcon.className = 'fa-solid fa-eye-slash';
+                toggleBtn.classList.remove('bg-indigo-600', 'border-indigo-500', 'text-white');
+            }
         }
 
         function loadDefaultImageFromFile() {
@@ -583,8 +726,6 @@
                 clearPaintLayer(false);
             };
             img.onerror = () => {
-                // Se a imagem 'foto-padrao.jpg' não for encontrada ou falhar no carregamento local,
-                // fallback seguro para a mandala vetorial padrão
                 loadDefaultTemplate();
             };
             img.src = 'foto-padrao.jpg';
@@ -819,6 +960,8 @@
                     return;
                 }
 
+                if (isShowingOriginal) return;
+
                 const rect = paintCanvas.getBoundingClientRect();
                 const x = (e.clientX - rect.left) / zoomScale;
                 const y = (e.clientY - rect.top) / zoomScale;
@@ -853,7 +996,8 @@
                     return;
                 }
 
-                if (!isDrawing) return;
+                if (isShowingOriginal || !isDrawing) return;
+
                 const rect = paintCanvas.getBoundingClientRect();
                 const x = (e.clientX - rect.left) / zoomScale;
                 const y = (e.clientY - rect.top) / zoomScale;
@@ -876,7 +1020,7 @@
             if (x < 0 || y < 0 || x >= paintCanvas.width || y >= paintCanvas.height) return;
             const pData = paintCtx.getImageData(x, y, 1, 1).data;
             const lData = lineCtx.getImageData(x, y, 1, 1).data;
-            
+
             let r = pData[0], g = pData[1], b = pData[2], a = pData[3];
             if (a === 0 && lData[3] > 128) {
                 r = lData[0]; g = lData[1]; b = lData[2];
@@ -939,7 +1083,6 @@
             paintCtx.restore();
         }
 
-        // Algoritmo de Preenchimento (Flood Fill com fechamento de lacunas e proteção de contornos)
         function floodFill(startX, startY, fillColorHex) {
             const w = paintCanvas.width;
             const h = paintCanvas.height;
@@ -961,10 +1104,7 @@
             const startB = pData[startIndex + 2];
             const startA = pData[startIndex + 3];
 
-            // Não preenche se já estiver na cor alvo
             if (startR === colorR && startG === colorG && startB === colorB && startA === Math.round(brushOpacity * 255)) return;
-
-            // Se o clique foi diretamente em cima da linha preta/contorno, cancela
             if (lData[startIndex + 3] > 40 && lData[startIndex] < 100) return;
 
             const queue = [[startX, startY]];
@@ -977,8 +1117,6 @@
                 visited[idx] = 1;
 
                 const pIdx = idx * 4;
-
-                // Proteção contra vazamento: verifica opacidade e tom escuro da linha de contorno
                 const lineAlpha = lData[pIdx + 3];
                 const lineR = lData[pIdx];
                 if (lineAlpha > 30 && lineR < 150) continue;
