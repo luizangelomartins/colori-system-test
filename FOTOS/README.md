@@ -3,8 +3,8 @@
 </div>
 
 <div align="center">
-  <img width="250em" src="FOTOS/call_of_the_night_nazuna_nanakusa.png">
-  <img width="250em" src="FOTOS/miside-mita.png">
+  <img width="250em" src="call_of_the_night_nazuna_nanakusa.png">
+  <img width="250em" src="miside-mita.png">
 </div>
 
 <div align="center">
