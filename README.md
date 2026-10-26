@@ -5,12 +5,12 @@
 
 <div align="center">
   <td align="center">
-    <img height="45" src="https://img.shields.io/badge/FEITO%20POR%20DISPOSITIVO%20MOBILE-1F1F1F?style=for-the-badge&logo=readme&logoColor=white"><br>
+    <img height="45" src="https://img.shields.io/badge/PINTURA%20FEITA%20POR%20DISPOSITIVO%20MOBILE-1F1F1F?style=for-the-badge&logo=readme&logoColor=white"><br>
   </td>
 </div>
 
 <div align="center">
-  <img width="250em" src="FOTOS/miside-mita.png">
+  <img width="250em" src="PINTURAS/call_of_the_night_nazuna_nanakusa.png">
   <img width="250em" src="PINTURAS/miside-mita.png">
 </div>
 
