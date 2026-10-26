@@ -14,6 +14,8 @@
 
 <div align="center">
   <img width="250em" src="dungeon_meshi_marcille_donato.png">
+  <img width="250em" src="sousou_no_frieren_frieren.jpg">
+  <img width="250em" src="sono_bisque_doll_marin_kitagawa.jpg">
 </div>
 
 <div align="center">
