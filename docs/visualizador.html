@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#101114">
+    <title>Estúdio Digital - Caderno</title>
+    <!-- Ícone do Sistema -->
+    <link rel="icon" href="./icon/system-icon.jpg" type="image/png">
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            color-scheme: dark;
+            --fundo: #101114;
+            --caderno: #202126;
+            --papel: #18191e;
+            --linha: rgba(112, 155, 190, .22);
+            --margem: rgba(207, 103, 116, .32);
+            --texto: #e8e8ec;
+            --secundario: #858792;
+            --destaque: #b6b9c7;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html {
+            height: 100%;
+            background: var(--fundo);
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            height: 100dvh;
+            padding: max(10px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: radial-gradient(ellipse at top, #202127 0%, var(--fundo) 58%);
+            color: var(--texto);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        /* Cabeçalho de Navegação e Seletor de Pastas */
+        .header-nav {
+            width: 100%;
+            max-width: 520px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            flex-shrink: 0;
+        }
+
+        .btn-home {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(32, 33, 38, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: var(--secundario);
+            font-size: 12px;
+            font-weight: 500;
+            text-decoration: none;
+            backdrop-filter: blur(6px);
+            transition: all 0.2s;
+        }
+
+        .btn-home:hover {
+            background: rgba(45, 47, 56, 0.95);
+            color: var(--texto);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .seletor-pasta {
+            background: rgba(32, 33, 38, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: var(--texto);
+            padding: 5px 10px;
+            font-size: 12px;
+            outline: none;
+            cursor: pointer;
+            backdrop-filter: blur(6px);
+        }
+
+        main {
+            width: 100%;
+            max-width: 520px;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+            position: relative;
+        }
+
+        .caderno-container {
+            position: relative;
+            width: 100%;
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .caderno {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            padding: 12px 10px 12px 27px;
+            overflow: hidden;
+            border: 1px solid #34353d;
+            border-radius: 12px;
+            background: linear-gradient(145deg, #292a30, #191a1f);
+            box-shadow: 0 18px 45px rgba(0, 0, 0, .32), inset 0 1px rgba(255, 255, 255, .035);
+            display: flex;
+        }
+
+        .espiral {
+            position: absolute;
+            left: 5px;
+            top: 15px;
+            bottom: 15px;
+            width: 17px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .espiral span {
+            flex: 0 0 9px;
+            width: 12px;
+            border: 2px solid #777983;
+            border-radius: 8px;
+            background: #25262b;
+            box-shadow: 0 1px 2px #000;
+        }
+
+        .pagina {
+            position: relative;
+            isolation: isolate;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            flex: 1;
+            overflow: hidden;
+            border-radius: 4px;
+            background-color: var(--papel);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .04);
+            transform-origin: left center;
+            backface-visibility: hidden;
+            touch-action: pan-y;
+        }
+
+        .pagina::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            background-image:
+                linear-gradient(to right, transparent 28px, var(--margem) 29px, var(--margem) 30px, transparent 31px),
+                repeating-linear-gradient(to bottom, transparent 0, transparent 29px, var(--linha) 30px, transparent 31px);
+            background-position: 0 0, 0 5px;
+        }
+
+        .pagina::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: 3;
+            pointer-events: none;
+            opacity: .7;
+            background: repeating-linear-gradient(to bottom, transparent 0, transparent 29px, rgba(110, 157, 194, .17) 30px, transparent 31px);
+            mix-blend-mode: screen;
+        }
+
+        .conteudo {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            padding: 12px 12px 12px 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .area-imagem {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        #imagem {
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            user-select: none;
+            -webkit-user-drag: none;
+            pointer-events: none;
+            margin: auto;
+        }
+
+        #mensagem {
+            position: absolute;
+            inset: 0;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            color: var(--secundario);
+            text-align: center;
+            font-size: 13px;
+            line-height: 1.6;
+            overflow-wrap: anywhere;
+            background: var(--papel);
+        }
+
+        #mensagem[hidden],
+        #imagem[hidden] {
+            display: none;
+        }
+
+        .btn-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 20;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 255, 255, .15);
+            border-radius: 50%;
+            background: rgba(30, 31, 37, .85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: #dedfe7;
+            font-size: 26px;
+            line-height: 1;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, .4);
+            transition: background .2s, transform .2s, opacity .2s;
+        }
+
+        .btn-nav#anterior {
+            left: -14px;
+        }
+
+        .btn-nav#proximo {
+            right: -14px;
+        }
+
+        .btn-nav:active:not(:disabled) {
+            transform: translateY(-50%) scale(.92);
+            background: rgba(50, 52, 62, .95);
+        }
+
+        .btn-nav:disabled {
+            opacity: .25;
+            cursor: default;
+        }
+
+        .rodape {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding-top: 8px;
+            flex-shrink: 0;
+        }
+
+        #contador {
+            min-width: 64px;
+            color: #a4a6b1;
+            font-size: 13px;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.5px;
+        }
+
+        @keyframes virarProxima {
+            0% { transform: perspective(1000px) rotateY(0); opacity: 1; }
+            45% { transform: perspective(1000px) rotateY(-65deg); opacity: .6; }
+            100% { transform: perspective(1000px) rotateY(0); opacity: 1; }
+        }
+
+        @keyframes virarAnterior {
+            0% { transform: perspective(1000px) rotateY(0); opacity: 1; }
+            45% { transform: perspective(1000px) rotateY(65deg); opacity: .6; }
+            100% { transform: perspective(1000px) rotateY(0); opacity: 1; }
+        }
+
+        .pagina.virando-proxima {
+            animation: virarProxima .38s ease-in-out;
+        }
+
+        .pagina.virando-anterior {
+            animation: virarAnterior .38s ease-in-out;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: max(6px, env(safe-area-inset-top)) 10px max(8px, env(safe-area-inset-bottom));
+            }
+            .caderno {
+                padding: 9px 8px 9px 22px;
+                border-radius: 10px;
+            }
+            .espiral {
+                left: 3px;
+                top: 12px;
+                bottom: 12px;
+                width: 15px;
+            }
+            .espiral span {
+                flex-basis: 8px;
+                width: 10px;
+            }
+            .conteudo {
+                padding: 8px 8px 8px 28px;
+            }
+            .btn-nav {
+                width: 40px;
+                height: 40px;
+                font-size: 22px;
+            }
+            .btn-nav#anterior { left: -10px; }
+            .btn-nav#proximo { right: -10px; }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Cabeçalho com Home e Seletor de Pastas -->
+    <div class="header-nav">
+        <a href="index.html" class="btn-home">
+            <i class="fa-solid fa-arrow-left"></i>
+            <span>Home</span>
+        </a>
+        
+        <!-- Defina suas pastas aqui no elemento select -->
+        <select id="seletorPasta" class="seletor-pasta" aria-label="Selecionar pasta de imagens">
+            <option value="./PINTURAS/">PINTURAS</option>
+            <option value="./FOTOS/">FOTOS</option>
+            <!-- Adicione mais pastas conforme necessário -->
+        </select>
+    </div>
+
+    <main>
+        <div class="caderno-container">
+            <button id="anterior" class="btn-nav" type="button" aria-label="Desenho anterior" disabled>‹</button>
+
+            <section class="caderno" aria-label="Caderno de desenhos">
+                <div class="espiral" aria-hidden="true">
+                    <span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span>
+                    <span></span><span></span>
+                </div>
+
+                <div class="pagina" id="pagina">
+                    <div class="conteudo">
+                        <div class="area-imagem">
+                            <img id="imagem" alt="" hidden>
+                            <div id="mensagem">Preparando seu caderno...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <button id="proximo" class="btn-nav" type="button" aria-label="Próximo desenho" disabled>›</button>
+        </div>
+
+        <footer class="rodape">
+            <span id="contador" aria-live="polite">0 / 0</span>
+        </footer>
+    </main>
+
+    <script>
+        const ARQUIVO_JSON = "imagens.json";
+
+        const pagina = document.getElementById("pagina");
+        const imagem = document.getElementById("imagem");
+        const mensagem = document.getElementById("mensagem");
+        const contador = document.getElementById("contador");
+        const anterior = document.getElementById("anterior");
+        const proximo = document.getElementById("proximo");
+        const seletorPasta = document.getElementById("seletorPasta");
+
+        let imagens = [];
+        let atual = 0;
+        let animando = false;
+        let toqueInicial = null;
+        let temporizadorAnimacao = null;
+
+        // Pega a pasta atual do select ou da URL se houver parâmetro
+        function obterPastaAtual() {
+            const params = new URLSearchParams(window.location.search);
+            const pastaUrl = params.get("pasta");
+            if (pastaUrl) {
+                seletorPasta.value = pastaUrl;
+            }
+            return seletorPasta.value;
+        }
+
+        function atualizarControles() {
+            contador.textContent = imagens.length ? `${atual + 1} / ${imagens.length}` : "0 / 0";
+            const desabilitar = animando || imagens.length <= 1;
+            anterior.disabled = desabilitar;
+            proximo.disabled = desabilitar;
+        }
+
+        function exibirImagem() {
+            if (!imagens.length) return;
+            const item = imagens[atual];
+            imagem.hidden = true;
+            mensagem.hidden = false;
+            mensagem.textContent = "Carregando desenho...";
+
+            imagem.onload = () => {
+                if (imagem.dataset.indice !== String(atual)) return;
+                imagem.hidden = false;
+                mensagem.hidden = true;
+            };
+
+            imagem.onerror = () => {
+                imagem.hidden = true;
+                mensagem.hidden = false;
+                mensagem.textContent = "Não foi possível carregar esta imagem.";
+            };
+
+            imagem.alt = item.nome;
+            imagem.dataset.indice = String(atual);
+            imagem.src = item.url;
+            atualizarControles();
+        }
+
+        function finalizarAnimacao() {
+            clearTimeout(temporizadorAnimacao);
+            pagina.classList.remove("virando-proxima", "virando-anterior");
+            animando = false;
+            atualizarControles();
+        }
+
+        function virarPagina(direcao) {
+            if (animando || !imagens.length) return;
+            let destino = (atual + direcao) % imagens.length;
+            if (destino < 0) destino = imagens.length - 1;
+
+            animando = true;
+            atualizarControles();
+            pagina.classList.remove("virando-proxima", "virando-anterior");
+            void pagina.offsetWidth;
+            pagina.classList.add(direcao > 0 ? "virando-proxima" : "virando-anterior");
+
+            temporizadorAnimacao = setTimeout(() => {
+                atual = destino;
+                exibirImagem();
+            }, 180);
+
+            pagina.addEventListener("animationend", finalizarAnimacao, { once: true });
+        }
+
+        anterior.addEventListener("click", () => virarPagina(-1));
+        proximo.addEventListener("click", () => virarPagina(1));
+
+        document.addEventListener("keydown", event => {
+            if (event.key === "ArrowRight") virarPagina(1);
+            if (event.key === "ArrowLeft") virarPagina(-1);
+        });
+
+        pagina.addEventListener("touchstart", event => {
+            if (event.touches.length === 1) toqueInicial = event.touches[0].clientX;
+        }, { passive: true });
+
+        pagina.addEventListener("touchend", event => {
+            if (toqueInicial === null) return;
+            const distancia = event.changedTouches[0].clientX - toqueInicial;
+            if (Math.abs(distancia) > 55) virarPagina(distancia < 0 ? 1 : -1);
+            toqueInicial = null;
+        }, { passive: true });
+
+        function obterLista(data) {
+            if (Array.isArray(data)) return data;
+            if (data && Array.isArray(data.imagens)) return data.imagens;
+            throw new Error('O JSON deve conter uma lista de imagens.');
+        }
+
+        function normalizarImagem(item, indice, pastaAtual) {
+            if (typeof item === "string") item = { arquivo: item };
+            const arquivo = item.arquivo || item.src || item.imagem;
+            return {
+                url: /^(https?:\/\/|data:image\/)/i.test(arquivo) ? arquivo : pastaAtual + arquivo.replace(/^\.?\//, ""),
+                nome: item.nome || item.titulo || `Desenho ${indice + 1}`
+            };
+        }
+
+        async function carregarImagens() {
+            const pastaAtual = obterPastaAtual();
+            mensagem.hidden = false;
+            mensagem.textContent = "Preparando seu caderno...";
+            
+            try {
+                const resposta = await fetch(pastaAtual + ARQUIVO_JSON, { cache: "no-cache" });
+                if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
+                const dados = await resposta.json();
+                
+                imagens = obterLista(dados).map((item, index) => normalizarImagem(item, index, pastaAtual));
+                if (!imagens.length) throw new Error("Vazio");
+                
+                atual = 0;
+                exibirImagem();
+            } catch (erro) {
+                console.error("Erro:", erro);
+                imagens = [
+                    { url: "https://picsum.photos/400/600?random=1", nome: "Exemplo 1" },
+                    { url: "https://picsum.photos/600/400?random=2", nome: "Exemplo 2" }
+                ];
+                atual = 0;
+                exibirImagem();
+            }
+        }
+
+        // Evento ao trocar de pasta no menu superior
+        seletorPasta.addEventListener("change", () => {
+            carregarImagens();
+        });
+
+        // Inicialização
+        carregarImagens();
+    </script>
+</body>
+
+</html>
